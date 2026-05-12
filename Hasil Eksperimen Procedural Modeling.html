@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebGL Rendering Methods Comparison</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: #12121c;
+  color: #d8d4cc;
+  font-family: 'Courier New', monospace;
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+header h1 {
+  font-size: 1.1rem;
+  font-weight: 400;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #9090a0;
+  margin-bottom: 0.4rem;
+}
+header p {
+  font-size: 0.65rem;
+  color: #444;
+  letter-spacing: 0.12em;
+}
+
+/* ---- section = one row (one object, three methods) ---- */
+.section { margin-bottom: 3rem; }
+.section-title {
+  font-size: 0.6rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #505060;
+  margin-bottom: 1rem;
+  padding-left: 0.25rem;
+  border-left: 2px solid #303048;
+  padding-left: 0.6rem;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+/* ---- individual card ---- */
+.card {
+  background: #1a1a28;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #252535;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-canvas {
+  position: relative;
+  height: 260px;
+  overflow: hidden;
+  background: #0e0e18;
+}
+.card-canvas canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+.card-canvas .loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.55rem;
+  letter-spacing: 0.15em;
+  color: #2a2a3a;
+}
+
+/* method badge top-left */
+.badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 0.55rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+.badge.sdf   { background: rgba(32,180,200,0.18); color: #3dcfdf; border: 1px solid rgba(61,207,223,0.35); }
+.badge.rule  { background: rgba(210,140,50,0.18);  color: #e09050; border: 1px solid rgba(220,150,60,0.35); }
+.badge.noise { background: rgba(160,100,220,0.18); color: #c090e0; border: 1px solid rgba(180,120,230,0.35); }
+
+/* top border accent per method */
+.card.sdf   { border-top: 2px solid #2aafbf; }
+.card.rule  { border-top: 2px solid #d08040; }
+.card.noise { border-top: 2px solid #a060d0; }
+
+/* ---- card info section ---- */
+.card-info {
+  padding: 1rem 1.1rem 1.2rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.card-meta {
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  color: #404055;
+  text-transform: uppercase;
+}
+.card-name {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #e0dcd4;
+  line-height: 1.2;
+}
+.card.sdf   .card-name { color: #60d0e0; }
+.card.rule  .card-name { color: #e0a060; }
+.card.noise .card-name { color: #c080e0; }
+
+.card-desc {
+  font-size: 0.68rem;
+  line-height: 1.6;
+  color: #707088;
+  font-family: 'Courier New', monospace;
+}
+.card-bullets {
+  list-style: none;
+  margin-top: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+.card-bullets li {
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  line-height: 1.4;
+}
+.card-bullets li::before {
+  content: '●';
+  font-size: 0.45rem;
+  margin-top: 0.22rem;
+  flex-shrink: 0;
+}
+.card.sdf   .card-bullets li { color: #3dbfcf; }
+.card.sdf   .card-bullets li::before { color: #3dbfcf; }
+.card.rule  .card-bullets li { color: #d09050; }
+.card.rule  .card-bullets li::before { color: #d09050; }
+.card.noise .card-bullets li { color: #b070d0; }
+.card.noise .card-bullets li::before { color: #b070d0; }
+
+footer {
+  text-align: center;
+  font-size: 0.6rem;
+  color: #303040;
+  letter-spacing: 0.1em;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #1e1e2e;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Rendering Method Comparison</h1>
+  <p>Three objects &nbsp;×&nbsp; Three construction methods &nbsp;—&nbsp; WebGL GLSL Raymarching</p>
+</header>
+
+<!-- ===== ROW 1: ROBOT HEAD ===== -->
+<div class="section">
+  <div class="section-title">Object 01 — Robot Head &nbsp;/&nbsp; Hard Surface · Mechanical</div>
+  <div class="cards">
+
+    <div class="card sdf">
+      <div class="card-canvas" id="cell-robot-sdf">
+        <div class="loading">INITIALIZING…</div>
+        <span class="badge sdf">SDF Method</span>
+      </div>
+      <div class="card-info">
+        <div class="card-meta">Method 01 / 03</div>
+        <div class="card-name">Signed Distance Fields</div>
+        <div class="card-desc">Uses <em>smooth minimum</em> (smin) to blend primitives. Panel seams, boolean cutouts, and eye lenses are exact. Surface is everywhere C¹ continuous — perfectly smooth, differentiable normals, zero seam artifacts.</div>
+        <ul class="card-bullets">
+          <li>Seamless smooth blending (smin kernel k=0.45)</li>
+          <li>Accurate gradient normals everywhere</li>
+          <li>Crisp boolean cutouts for grills & visors</li>
+          <li>Full analytic control over blend radius</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card rule">
+      <div class="card-canvas" id="cell-robot-rule">
+        <div class="loading">INITIALIZING…</div>
+        <span class="badge rule">Rule-Based</span>
+      </div>
+      <div class="card-info">
+        <div class="card-meta">Method 02 / 03</div>
+        <div class="card-name">Rule-Based (CSG Hard Union)</div>
+        <div class="card-desc">Identical box & sphere primitives combined with a hard boolean <code>min()</code>. A C⁰ discontinuity — a sharp ridge — forms wherever two surfaces intersect. No blending possible.</div>
+        <ul class="card-bullets">
+          <li>Visible sharp seams at every junction</li>
+          <li>Broken gradient → incorrect normals at creases</li>
+          <li>Shadow & AO banding at hard edges</li>
+          <li>No control over transition smoothness</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card noise">
+      <div class="card-canvas" id="cell-robot-noise">
+        <div class="loading">INITIALIZING…</div>
+        <span class="badge noise">Procedural Noise</span>
+      </div>
+      <div class="card-info">
+        <div class="card-meta">Method 03 / 03</div>
+        <div class="card-name">Procedural Noise (fBm Displacement)</div>
+        <div class="card-desc">A sphere & box displaced by 3-octave sinusoidal noise. All crisp mechanical edges are lost — the head becomes blobby. Noise cannot represent distinct sub-objects cleanly.</div>
+        <ul class="card-bullets">
+          <li>No precise shape or topology control</li>
+          <li>Uniformly bumpy — no clean panel edges</li>
+          <li>Noisy normals cause specular artifacts</li>
+          <li>Cannot represent distinct mechanical parts</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== ROW 2: TREE ===== -->
+<div class="section">
+  <div class="section-title">Object 02 — Tree &nbsp;/&nbsp; Recursive Branching · Organic Structure</div>
+  <div class="cards">
+
+    <div class="card sdf">
+      <div class="card-canvas" id="cell-tree-sdf">
+        <div class="loading">INITIALIZING…</div>
+        <span class="badge sdf">SDF Method</span>
+      </div>
+      <div class="card-info">
+        <div class="card-meta">Method 01 / 03</div>
+        <div class="card-name">Signed Distance Fields</div>
+        <div class="card-desc">Capsule SDFs blended with smin at every branch junction. The trunk-to-branch transition is perfectly smooth. Leaf clusters use sphere smin for organic softness with exact silhouettes.</div>
+        <ul class="card-bullets">
+          <li>Smooth branch-trunk merge with smin</li>
+          <li>Accurate normals for soft lighting</li>
+          <li>Leaf spheres blend naturally into canopy</li>
+          <li>Controllable blend radius per joint</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card rule">
+      <div class="card-canvas" id="cell-tree-rule">
+        <div class="loading">INITIALIZING…</div>
+        <span class="badge rule">Rule-Based</span>
+      </div>
+      <div class="card-info">
+        <div class="card-meta">Method 02 / 03</div>
+        <div class="card-name">Rule-Based (L-System Fork)</div>
+        <div class="card-desc">Iterative stack-based L-system: each branch forks at a fixed 35° angle with 0.7× scale reduction. Perfectly deterministic and symmetric. Hard capsule unions create visible seam ridges at every fork.</div>
+        <ul class="card-bullets">
+          <li>Deterministic symmetric branching pattern</li>
+          <li>Hard seam ridge at every branch junction</li>
+          <li>Fixed angle rules — no organic variation</li>
+          <li>Lighting artifacts at capsule intersections</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card noise">
+      <div class="card-canvas" id="cell-tree-noise">
+        <div class="loading">INITIALIZING…</div>
+        <span class="badge noise">Procedural Noise</span>
+      </div>
+      <div class="card-info">
+        <div class="card-meta">Method 03 / 03</div>
+        <div class="card-name">Procedural Noise (fBm Displacement)</div>
+        <div class="card-desc">Noise-twisted cylinder trunk and a sinusoidally displaced sphere crown. The silhouette is organic but the canopy has no distinct branches — just an undifferentiated bumpy blob.</div>
+        <ul class="card-bullets">
+          <li>Organic silhouette from noise displacement</li>
+          <li>No distinct branches — unified blob canopy</li>
+          <li>Cannot reproduce deterministic structure</li>
+          <li>Surface roughness uncontrollable globally</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== ROW 3: TERRAIN ===== -->
+<div class="section">
+  <div class="section-title">Object 03 — Terrain &nbsp;/&nbsp; Heightfield Surface · Geological Forms</div>
+  <div class="cards">
+
+    <div class="card sdf">
+      <div class="card-canvas" id="cell-terrain-sdf">
+        <div class="loading">INITIALIZING…</div>
+        <span class="badge sdf">SDF Method</span>
+      </div>
+      <div class="card-info">
+        <div class="card-meta">Method 01 / 03</div>
+        <div class="card-name">Signed Distance Fields</div>
+        <div class="card-desc">Exact cone primitives, smin blended ridges, and boolean-subtracted strata lines and valley channels. Every geological feature has mathematical precision — cliff edges are perfectly sharp where needed.</div>
+        <ul class="card-bullets">
+          <li>Exact cone & smin-blended ridge peaks</li>
+          <li>Precise cliff strata via boolean subtraction</li>
+          <li>Valley carved with exact box subtraction</li>
+          <li>Height-based color with analytic normals</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card rule">
+      <div class="card-canvas" id="cell-terrain-rule">
+        <div class="loading">INITIALIZING…</div>
+        <span class="badge rule">Rule-Based</span>
+      </div>
+      <div class="card-info">
+        <div class="card-meta">Method 02 / 03</div>
+        <div class="card-name">Rule-Based (Diamond-Square)</div>
+        <div class="card-desc">Diamond-square quadrant rules: axis-aligned ridges, quadrant-signed hills, and diamond crosshatch pattern stacked deterministically. Terrain is angular and grid-aligned — no organic variation.</div>
+        <ul class="card-bullets">
+          <li>Purely deterministic, fully repeatable</li>
+          <li>Angular grid-aligned ridges and valleys</li>
+          <li>No organic irregularity or randomness</li>
+          <li>Step artifacts from discrete quadrant rules</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card noise">
+      <div class="card-canvas" id="cell-terrain-noise">
+        <div class="loading">INITIALIZING…</div>
+        <span class="badge noise">Procedural Noise</span>
+      </div>
+      <div class="card-info">
+        <div class="card-meta">Method 03 / 03</div>
+        <div class="card-name">Procedural Noise (fBm Heightfield)</div>
+        <div class="card-desc">6-octave fractal Brownian motion stacked over 3 frequencies. Produces the most geologically convincing terrain — but zero precision. No cliff at a specific location, no exact valley width.</div>
+        <ul class="card-bullets">
+          <li>Most organic & geologically convincing</li>
+          <li>Zero control over exact feature placement</li>
+          <li>Cannot carve a specific valley or ridge</li>
+          <li>Rich multi-scale detail from fbm octaves</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer>WebGL2 · GLSL Raymarching · SDF / Rule-Based / Procedural Noise comparison</footer>
+
+<script>
+const VS = `#version 300 es
+in vec2 a_pos;
+void main(){ gl_Position = vec4(a_pos,0.,1.); }`;
+
+function createProgram(gl, fsSource){
+  function compileShader(type,src){
+    const s=gl.createShader(type);
+    gl.shaderSource(s,src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){ console.error(gl.getShaderInfoLog(s)); return null; }
+    return s;
+  }
+  const vs=compileShader(gl.VERTEX_SHADER,VS);
+  const fs=compileShader(gl.FRAGMENT_SHADER,fsSource);
+  if(!vs||!fs) return null;
+  const prog=gl.createProgram();
+  gl.attachShader(prog,vs); gl.attachShader(prog,fs); gl.linkProgram(prog);
+  return prog;
+}
+
+function setupCanvas(containerId, fsSource, w=480, h=260){
+  const container=document.getElementById(containerId);
+  if(!container) return;
+  const loading=container.querySelector('.loading');
+  const canvas=document.createElement('canvas');
+  canvas.width=w; canvas.height=h;
+  container.insertBefore(canvas,container.firstChild);
+  const gl=canvas.getContext('webgl2');
+  if(!gl){ if(loading) loading.textContent='WebGL2 NOT SUPPORTED'; return; }
+  const prog=createProgram(gl,fsSource);
+  if(!prog){ if(loading) loading.textContent='SHADER ERROR'; return; }
+  if(loading) loading.remove();
+  gl.useProgram(prog);
+  const buf=gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+  const loc=gl.getAttribLocation(prog,'a_pos');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+  const uTime=gl.getUniformLocation(prog,'u_time');
+  const uRes=gl.getUniformLocation(prog,'u_res');
+  gl.uniform2f(uRes,w,h);
+  let t0=performance.now();
+  function render(){
+    const t=(performance.now()-t0)*0.001;
+    gl.uniform1f(uTime,t);
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+    requestAnimationFrame(render);
+  }
+  render();
+}
+
+const COMMON_MATH = `
+float smin(float a,float b,float k){ float h=clamp(0.5+0.5*(b-a)/k,0.,1.); return mix(b,a,h)-k*h*(1.-h); }
+float smax(float a,float b,float k){ return -smin(-a,-b,k); }
+mat2 rot2(float a){ float c=cos(a),s=sin(a); return mat2(c,-s,s,c); }
+float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float noise(vec2 p){ vec2 i=floor(p),f=fract(p),u=f*f*(3.-2.*f);
+  return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y); }
+float fbm(vec2 p){ float v=0.,a=.5; for(int i=0;i<6;i++){ v+=a*noise(p); p*=2.1; a*=.5; } return v; }
+`;
+
+const COMMON_LIGHTING = `
+vec3 calcNormalSDF(vec3 p, float eps){
+  vec2 e=vec2(eps,0.);
+  return normalize(vec3(mapScene(p+e.xyy)-mapScene(p-e.xyy),
+                        mapScene(p+e.yxy)-mapScene(p-e.yxy),
+                        mapScene(p+e.yyx)-mapScene(p-e.yyx)));
+}
+vec3 shadeMech(vec3 p, vec3 n, vec3 rd, vec3 baseCol, float roughness){
+  vec3 ld=normalize(vec3(1.2,2.,1.5));
+  float diff=max(dot(n,ld),0.)*0.8;
+  vec3 h2=normalize(ld-rd);
+  float spec=pow(max(dot(n,h2),0.),mix(256.,8.,roughness));
+  float rim=pow(1.-max(dot(n,-rd),0.),3.)*0.3;
+  vec3 sky=vec3(0.12,0.14,0.22);
+  return baseCol*(0.85*(sky+diff))+vec3(0.9,0.95,1.)*spec+baseCol*rim;
+}
+`;
+
+/* ========== ROBOT HEAD ========== */
+const ROBOT_SDF_FS = `#version 300 es
+precision highp float;
+uniform float u_time; uniform vec2 u_res; out vec4 fragColor;
+${COMMON_MATH}
+float sdBox(vec3 p,vec3 b){ vec3 q=abs(p)-b; return length(max(q,0.))+min(max(q.x,max(q.y,q.z)),0.); }
+float sdSphere(vec3 p,float r){ return length(p)-r; }
+float sdCylinder(vec3 p,float r,float h){ vec2 d=abs(vec2(length(p.xz),p.y))-vec2(r,h); return min(max(d.x,d.y),0.)+length(max(d,0.)); }
+float sdCapsule(vec3 p,vec3 a,vec3 b,float r){ vec3 pa=p-a,ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.,1.); return length(pa-ba*h)-r; }
+vec3 g_mat=vec3(0.);
+float mapScene(vec3 p){
+  p.y-=0.05;
+  float skull=sdSphere(p-vec3(0.,.15,0.),.55);
+  skull=max(skull,p.y+0.1);
+  float chin=sdBox(p-vec3(0.,-.28,0.),vec3(0.38,0.18,0.35));
+  chin=smin(chin,sdBox(p-vec3(0.,-.1,.18),vec3(0.35,0.28,0.18)),0.12);
+  float head=smin(skull,chin,0.08);
+  float neck=sdCylinder(p-vec3(0.,-.55,0.),.16,.12);
+  head=smin(head,neck,0.05);
+  float facecut=sdBox(p-vec3(0.,-.05,.38),vec3(0.32,0.22,0.08));
+  head=max(head,-facecut+0.04);
+  float visor=sdBox(p-vec3(0.,0.,.42),vec3(0.28,0.06,0.06));
+  head=max(head,-visor);
+  float jawL=sdBox(p-vec3(.32,-.26,.12),vec3(0.07,0.12,0.22));
+  float jawR=sdBox(p-vec3(-.32,-.26,.12),vec3(0.07,0.12,0.22));
+  head=smin(head,min(jawL,jawR),0.06);
+  float eyeL=sdSphere(p-vec3(.18,.1,.48),.09);
+  float eyeR=sdSphere(p-vec3(-.18,.1,.48),.09);
+  float earL=sdBox(p-vec3(.52,.08,0.),vec3(0.06,0.18,0.12));
+  float earR=sdBox(p-vec3(-.52,.08,0.),vec3(0.06,0.18,0.12));
+  head=smin(head,min(earL,earR),0.04);
+  float ant=sdCapsule(p,vec3(0.,.65,0.),vec3(0.,.55,0.),.025);
+  ant=smin(ant,sdSphere(p-vec3(0.,.67,0.),.04),0.02);
+  float grillA=sdBox(p-vec3(0.,-.32,.4),vec3(0.18,0.02,0.04));
+  float grillB=sdBox(p-vec3(0.,-.38,.4),vec3(0.14,0.02,0.04));
+  float grillC=sdBox(p-vec3(0.,-.44,.4),vec3(0.10,0.02,0.04));
+  float grills=min(grillA,min(grillB,grillC));
+  head=max(head,-grills*0.8);
+  float seam1=sdBox(p-vec3(0.,.12,0.),vec3(0.6,0.008,0.6));
+  float seam2=sdBox(p-vec3(0.,-.05,0.),vec3(0.6,0.006,0.6));
+  head=max(head,-seam1*0.5); head=max(head,-seam2*0.5);
+  float d=smin(head,ant,0.01);
+  float res=d; g_mat=vec3(0.82,0.80,0.78);
+  if(eyeL<d){ res=eyeL; g_mat=vec3(0.05,0.05,0.08); }
+  if(eyeR<res){ res=eyeR; g_mat=vec3(0.05,0.05,0.08); }
+  return res;
+}
+${COMMON_LIGHTING}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y;
+  float angle=u_time*0.25+0.5;
+  vec3 ro=vec3(sin(angle)*1.8,.2,cos(angle)*1.8),ta=vec3(0.);
+  vec3 ww=normalize(ta-ro),uu=normalize(cross(ww,vec3(0,1,0))),vv=cross(uu,ww);
+  vec3 rd=normalize(uv.x*uu+uv.y*vv+1.5*ww);
+  float t=0.05; vec3 col=vec3(0.05,0.06,0.1); bool hit=false; vec3 mat=vec3(.8);
+  for(int i=0;i<96;i++){
+    vec3 p=ro+rd*t; float d=mapScene(p);
+    if(d<0.001){ hit=true; mat=g_mat; break; }
+    t+=d; if(t>8.) break;
+  }
+  if(hit){
+    vec3 p=ro+rd*t; vec3 n=calcNormalSDF(p,0.001);
+    float rr=length(mat-vec3(0.82,0.80,0.78))<0.1?0.12:0.9;
+    col=shadeMech(p,n,rd,mat,rr);
+    col=pow(max(col,0.),vec3(0.45));
+  }
+  fragColor=vec4(col,1.);
+}`;
+
+const ROBOT_RULE_FS = `#version 300 es
+precision highp float;
+uniform float u_time; uniform vec2 u_res; out vec4 fragColor;
+${COMMON_MATH}
+float sdBox(vec3 p,vec3 b){ vec3 q=abs(p)-b; return length(max(q,0.))+min(max(q.x,max(q.y,q.z)),0.); }
+float sdSphere(vec3 p,float r){ return length(p)-r; }
+float sdCylinder(vec3 p,float r,float h){ vec2 d=abs(vec2(length(p.xz),p.y))-vec2(r,h); return min(max(d.x,d.y),0.)+length(max(d,0.)); }
+vec3 g_mat=vec3(0.72,0.71,0.69);
+float mapScene(vec3 p){
+  float dome=sdSphere(p-vec3(0.,.2,0.),.52);
+  dome=max(dome,p.y-0.65);
+  float face=sdBox(p-vec3(0.,0.,.02),vec3(0.36,0.28,0.42));
+  face=max(face,-sdBox(p-vec3(0.,0.,.44),vec3(0.3,0.22,0.05)));
+  float body=min(dome,face);
+  float jawL=sdBox(p-vec3(.25,-.28,.08),vec3(0.12,0.12,0.3));
+  float jawR=sdBox(p-vec3(-.25,-.28,.08),vec3(0.12,0.12,0.3));
+  body=min(body,min(jawL,jawR));
+  float cran=sdBox(p-vec3(0.,.45,-.02),vec3(0.4,0.15,0.38));
+  body=min(body,cran);
+  float earL=sdBox(p-vec3(.5,.05,-.02),vec3(0.08,0.2,0.18));
+  float earR=sdBox(p-vec3(-.5,.05,-.02),vec3(0.08,0.2,0.18));
+  body=min(body,min(earL,earR));
+  float neck=sdBox(p-vec3(0.,-.52,0.),vec3(0.16,0.12,0.16));
+  body=min(body,neck);
+  float grills=1e9;
+  for(int i=0;i<4;i++){
+    float gy=-.25-float(i)*.065;
+    grills=min(grills,sdBox(p-vec3(0.,gy,.42),vec3(0.15,0.018,0.04)));
+  }
+  float eyeL=sdSphere(p-vec3(.17,.1,.44),.085);
+  float eyeR=sdSphere(p-vec3(-.17,.1,.44),.085);
+  float res=body; g_mat=vec3(0.70,0.68,0.66);
+  if(eyeL<res){ res=eyeL; g_mat=vec3(0.04,0.04,0.06); }
+  if(eyeR<res){ res=eyeR; g_mat=vec3(0.04,0.04,0.06); }
+  if(grills<res){ res=min(res,grills); g_mat=vec3(0.28,0.28,0.30); }
+  return res;
+}
+${COMMON_LIGHTING}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y;
+  float angle=u_time*0.25+0.5;
+  vec3 ro=vec3(sin(angle)*1.8,.2,cos(angle)*1.8),ta=vec3(0.);
+  vec3 ww=normalize(ta-ro),uu=normalize(cross(ww,vec3(0,1,0))),vv=cross(uu,ww);
+  vec3 rd=normalize(uv.x*uu+uv.y*vv+1.5*ww);
+  float t=0.05; vec3 col=vec3(0.05,0.06,0.1); bool hit=false; vec3 mat=vec3(.8);
+  for(int i=0;i<96;i++){
+    vec3 p=ro+rd*t; float d=mapScene(p);
+    if(d<0.001){ hit=true; mat=g_mat; break; }
+    t+=d; if(t>8.) break;
+  }
+  if(hit){
+    vec3 p=ro+rd*t; vec3 n=calcNormalSDF(p,0.001);
+    float rr=length(mat-vec3(0.04,0.04,0.06))<0.1?0.95:0.28;
+    col=shadeMech(p,n,rd,mat,rr);
+    col=pow(max(col,0.),vec3(0.45));
+  }
+  fragColor=vec4(col,1.);
+}`;
+
+const ROBOT_NOISE_FS = `#version 300 es
+precision highp float;
+uniform float u_time; uniform vec2 u_res; out vec4 fragColor;
+${COMMON_MATH}
+float sdSphere(vec3 p,float r){ return length(p)-r; }
+float sdBox(vec3 p,vec3 b){ vec3 q=abs(p)-b; return length(max(q,0.))+min(max(q.x,max(q.y,q.z)),0.); }
+vec3 g_mat=vec3(0.68,0.64,0.60);
+float noiseD(vec3 p,float f,float a){
+  float n=sin(p.x*f)*sin(p.y*f*1.3)*sin(p.z*f*0.9);
+  n+=sin(p.x*f*2.1+1.)*sin(p.y*f*1.7)*sin(p.z*f*2.3)*0.5;
+  n+=sin(p.x*f*4.3)*sin(p.y*f*3.7+2.)*sin(p.z*f*4.1)*0.25;
+  return n*a;
+}
+float mapScene(vec3 p){
+  float skull=sdSphere(p-vec3(0.,.1,0.),.52)+noiseD(p,4.5,0.06);
+  float face=sdBox(p-vec3(0.,-.05,.02),vec3(0.36,0.32,0.42))+noiseD(p,6.,0.04);
+  float head=min(skull,face);
+  float earL=sdSphere(p-vec3(.5,.05,0.),.18)+noiseD(p,5.,0.05);
+  float earR=sdSphere(p-vec3(-.5,.05,0.),.18)+noiseD(p,5.,0.05);
+  head=min(head,min(earL,earR));
+  float eyeL=sdSphere(p-vec3(.18,.1,.44),.09)+noiseD(p,9.,0.02);
+  float eyeR=sdSphere(p-vec3(-.18,.1,.44),.09)+noiseD(p,9.,0.02);
+  float res=head; g_mat=vec3(0.68,0.64,0.60);
+  if(eyeL<res){ res=eyeL; g_mat=vec3(0.06,0.05,0.08); }
+  if(eyeR<res){ res=eyeR; g_mat=vec3(0.06,0.05,0.08); }
+  return res;
+}
+${COMMON_LIGHTING}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y;
+  float angle=u_time*0.25+0.5;
+  vec3 ro=vec3(sin(angle)*1.8,.2,cos(angle)*1.8),ta=vec3(0.);
+  vec3 ww=normalize(ta-ro),uu=normalize(cross(ww,vec3(0,1,0))),vv=cross(uu,ww);
+  vec3 rd=normalize(uv.x*uu+uv.y*vv+1.5*ww);
+  float t=0.05; vec3 col=vec3(0.05,0.06,0.1); bool hit=false; vec3 mat=vec3(.8);
+  for(int i=0;i<80;i++){
+    vec3 p=ro+rd*t; float d=mapScene(p)*0.5;
+    if(d<0.002){ hit=true; mat=g_mat; break; }
+    t+=d; if(t>8.) break;
+  }
+  if(hit){
+    vec3 p=ro+rd*t; vec3 n=calcNormalSDF(p,0.003);
+    float rr=length(mat-vec3(0.06,0.05,0.08))<0.1?0.95:0.55;
+    col=shadeMech(p,n,rd,mat,rr);
+    col=pow(max(col,0.),vec3(0.45));
+  }
+  fragColor=vec4(col,1.);
+}`;
+
+/* ========== TREE ========== */
+const TREE_SDF_FS = `#version 300 es
+precision highp float;
+uniform float u_time; uniform vec2 u_res; out vec4 fragColor;
+${COMMON_MATH}
+float sdCapsule(vec3 p,vec3 a,vec3 b,float r){ vec3 pa=p-a,ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.,1.); return length(pa-ba*h)-r; }
+float sdSphere(vec3 p,float r){ return length(p)-r; }
+vec3 g_col=vec3(0.3,0.18,0.1);
+float mapScene(vec3 p){
+  vec3 lp=p-vec3(0.,-1.,0.);
+  float d=sdCapsule(lp,vec3(0.),vec3(0.,1.1,0.),.09);
+  vec3 b1e=vec3(0.,1.1,0.);
+  for(int i=0;i<5;i++){
+    float ang=float(i)*1.2566+u_time*0.05;
+    float tilt=0.38+float(i)*0.07;
+    vec3 dir=vec3(cos(ang)*sin(tilt),cos(tilt),sin(ang)*sin(tilt));
+    vec3 be=b1e+dir*0.65;
+    d=smin(d,sdCapsule(lp,b1e,be,.05),0.06);
+    for(int j=0;j<4;j++){
+      float ang2=ang+float(j)*1.5708;
+      float tilt2=tilt+0.3;
+      vec3 dir2=vec3(cos(ang2)*sin(tilt2),cos(tilt2),sin(ang2)*sin(tilt2));
+      vec3 be2=be+dir2*0.38;
+      d=smin(d,sdCapsule(lp,be,be2,.028),0.04);
+      for(int k=0;k<3;k++){
+        float ang3=ang2+float(k)*2.094;
+        float tilt3=tilt2+0.32;
+        vec3 dir3=vec3(cos(ang3)*sin(tilt3),cos(tilt3),sin(ang3)*sin(tilt3));
+        vec3 be3=be2+dir3*0.22;
+        d=smin(d,sdCapsule(lp,be2,be3,.014),0.025);
+        d=smin(d,sdSphere(lp-be3,.1+sin(ang3+u_time*.3)*.02),0.08);
+      }
+    }
+  }
+  if(d<0.12) g_col=vec3(0.25,0.14,0.06); else g_col=vec3(0.2,0.48,0.15);
+  return d;
+}
+${COMMON_LIGHTING}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y;
+  vec3 ro=vec3(0.,.5,3.2),ta=vec3(0.,.2,0.);
+  vec3 ww=normalize(ta-ro),uu=normalize(cross(ww,vec3(0,1,0))),vv=cross(uu,ww);
+  vec3 rd=normalize(uv.x*uu+uv.y*vv+1.5*ww);
+  float t=0.05; vec3 col=vec3(0.05,0.08,0.05); bool hit=false; vec3 mat=g_col;
+  for(int i=0;i<96;i++){
+    vec3 p=ro+rd*t; float d=mapScene(p);
+    if(d<0.002){ hit=true; mat=g_col; break; }
+    t+=d; if(t>12.) break;
+  }
+  if(hit){
+    vec3 p=ro+rd*t; vec3 n=calcNormalSDF(p,0.002);
+    col=shadeMech(p,n,rd,mat,0.85);
+    col=pow(max(col,0.),vec3(0.45));
+  }
+  fragColor=vec4(col,1.);
+}`;
+
+const TREE_RULE_FS = `#version 300 es
+precision highp float;
+uniform float u_time; uniform vec2 u_res; out vec4 fragColor;
+${COMMON_MATH}
+float sdCapsule(vec3 p,vec3 a,vec3 b,float r){ vec3 pa=p-a,ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.,1.); return length(pa-ba*h)-r; }
+float sdSphere(vec3 p,float r){ return length(p)-r; }
+vec3 g_col=vec3(0.25,0.14,0.06);
+float mapScene(vec3 p){
+  vec3 lp=p-vec3(0.,-1.,0.);
+  float d=1e9;
+  vec3 stk_o[32]; vec3 stk_d[32]; float stk_l[32]; float stk_r[32]; int stk_dep[32];
+  int top=0;
+  stk_o[top]=vec3(0.); stk_d[top]=vec3(0.,1.,0.); stk_l[top]=0.9; stk_r[top]=0.09; stk_dep[top]=0; top++;
+  for(int iter=0;iter<32;iter++){
+    if(top<=0) break;
+    top--;
+    vec3 o=stk_o[top],dv=stk_d[top]; float l=stk_l[top],r=stk_r[top]; int dep=stk_dep[top];
+    vec3 e=o+dv*l;
+    d=min(d,sdCapsule(lp,o,e,r));
+    if(dep<4&&top<28){
+      float ba=0.61;
+      mat2 RL=rot2(ba),RR=rot2(-ba);
+      vec3 dL=normalize(vec3(RL*dv.xy,dv.z));
+      vec3 dR=normalize(vec3(RR*dv.xy,dv.z));
+      mat2 RLz=rot2(0.3),RRz=rot2(-0.3);
+      dL.xz=RLz*dL.xz; dR.xz=RRz*dR.xz;
+      float nl=l*0.7,nr=r*0.65;
+      stk_o[top]=e; stk_d[top]=dL; stk_l[top]=nl; stk_r[top]=nr; stk_dep[top]=dep+1; top++;
+      stk_o[top]=e; stk_d[top]=dR; stk_l[top]=nl; stk_r[top]=nr; stk_dep[top]=dep+1; top++;
+    } else if(dep>=4){
+      d=min(d,sdSphere(lp-e,.08));
+    }
+  }
+  if(d<0.09) g_col=vec3(0.22,0.13,0.06); else g_col=vec3(0.15,0.4,0.1);
+  return d;
+}
+${COMMON_LIGHTING}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y;
+  vec3 ro=vec3(0.,.5,3.2),ta=vec3(0.,.2,0.);
+  vec3 ww=normalize(ta-ro),uu=normalize(cross(ww,vec3(0,1,0))),vv=cross(uu,ww);
+  vec3 rd=normalize(uv.x*uu+uv.y*vv+1.5*ww);
+  float t=0.05; vec3 col=vec3(0.04,0.06,0.04); bool hit=false; vec3 mat=g_col;
+  for(int i=0;i<128;i++){
+    vec3 p=ro+rd*t; float d=mapScene(p);
+    if(d<0.003){ hit=true; mat=g_col; break; }
+    t+=d*0.7; if(t>12.) break;
+  }
+  if(hit){
+    vec3 p=ro+rd*t; vec3 n=calcNormalSDF(p,0.003);
+    col=shadeMech(p,n,rd,mat,0.9);
+    col=pow(max(col,0.),vec3(0.45));
+  }
+  fragColor=vec4(col,1.);
+}`;
+
+const TREE_NOISE_FS = `#version 300 es
+precision highp float;
+uniform float u_time; uniform vec2 u_res; out vec4 fragColor;
+${COMMON_MATH}
+float sdSphere(vec3 p,float r){ return length(p)-r; }
+vec3 g_col=vec3(0.25,0.5,0.15);
+float nBranch(vec3 p,float h0,float h1,float r0,float r1){
+  float y=clamp((p.y-h0)/(h1-h0),0.,1.);
+  float rad=mix(r0,r1,y);
+  float disp=sin(p.y*5.+p.x*3.+1.)*0.03+sin(p.y*9.-p.z*4.)*0.015+sin(p.x*7.+p.z*5.+2.)*0.012;
+  return length(p.xz)-rad+disp;
+}
+float mapScene(vec3 p){
+  vec3 lp=p-vec3(0.,-1.,0.);
+  vec3 tw=lp; tw.x+=sin(lp.y*2.)*0.08; tw.z+=cos(lp.y*2.)*0.06;
+  float trunk=nBranch(tw,0.,1.2,.1,.04);
+  trunk=max(trunk,-(lp.y+0.05)); trunk=max(trunk,lp.y-1.2);
+  float crown=sdSphere(lp-vec3(0.,1.6,0.),.7);
+  crown+=sin(lp.x*4.+lp.y*3.)*0.12+sin(lp.z*5.-lp.y*4.)*0.08+sin(lp.x*7.+lp.z*6.)*0.05;
+  float d=min(trunk,crown);
+  if(trunk<crown) g_col=vec3(0.28,0.18,0.08);
+  else g_col=mix(vec3(0.18,0.42,0.12),vec3(0.1,0.28,0.06),clamp((lp.y-1.2)/.7,0.,1.));
+  return d;
+}
+${COMMON_LIGHTING}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y;
+  vec3 ro=vec3(0.,.5,3.2),ta=vec3(0.,.2,0.);
+  vec3 ww=normalize(ta-ro),uu=normalize(cross(ww,vec3(0,1,0))),vv=cross(uu,ww);
+  vec3 rd=normalize(uv.x*uu+uv.y*vv+1.5*ww);
+  float t=0.05; vec3 col=vec3(0.04,0.06,0.04); bool hit=false; vec3 mat=g_col;
+  for(int i=0;i<96;i++){
+    vec3 p=ro+rd*t; float d=mapScene(p)*0.4;
+    if(d<0.003){ hit=true; mat=g_col; break; }
+    t+=d; if(t>12.) break;
+  }
+  if(hit){
+    vec3 p=ro+rd*t; vec3 n=calcNormalSDF(p,0.004);
+    col=shadeMech(p,n,rd,mat,0.9);
+    col=pow(max(col,0.),vec3(0.45));
+  }
+  fragColor=vec4(col,1.);
+}`;
+
+/* ========== TERRAIN ========== */
+const TERRAIN_SDF_FS = `#version 300 es
+precision highp float;
+uniform float u_time; uniform vec2 u_res; out vec4 fragColor;
+${COMMON_MATH}
+float sdBox(vec3 p,vec3 b){ vec3 q=abs(p)-b; return length(max(q,0.))+min(max(q.x,max(q.y,q.z)),0.); }
+vec3 g_col=vec3(0.4,0.35,0.28);
+float mapScene(vec3 p){
+  float ground=p.y+0.8;
+  float cone=length(vec2(length(p.xz)*0.7,p.y+0.8))-1.2;
+  cone=max(cone,-(p.y+0.8+0.3));
+  float peak2=length(vec2(length(p.xz-vec2(1.2,.6))*.75,p.y+0.8))-0.9;
+  float valley=sdBox(p-vec3(0.,-.3,.5),vec3(0.35,.5,3.));
+  float land=smin(ground,smin(cone,peak2,.4),.3);
+  land=max(land,-valley*0.7);
+  for(int i=0;i<5;i++){
+    float hy=-.5+float(i)*.2;
+    float strata=sdBox(p-vec3(0.,hy,0.),vec3(4.,.012,4.));
+    if(land<0.02) land=max(land,-strata*.5);
+  }
+  float h=(p.y+0.8)/1.2;
+  vec3 sand=vec3(0.72,.62,.42),grass=vec3(0.25,.45,.18),rock=vec3(0.45,.38,.30),snow=vec3(0.9,.92,.95);
+  g_col=mix(sand,grass,smoothstep(0.,.15,h));
+  g_col=mix(g_col,rock,smoothstep(.3,.55,h));
+  g_col=mix(g_col,snow,smoothstep(.75,.95,h));
+  return land;
+}
+${COMMON_LIGHTING}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y;
+  vec3 ro=vec3(sin(u_time*.15)*1.5+.5,1.2,cos(u_time*.15)*1.5+2.),ta=vec3(0.,-.2,0.);
+  vec3 ww=normalize(ta-ro),uu=normalize(cross(ww,vec3(0,1,0))),vv=cross(uu,ww);
+  vec3 rd=normalize(uv.x*uu+uv.y*vv+1.4*ww);
+  float t=0.05; vec3 col=vec3(0.45,.6,.8); bool hit=false; vec3 mat=g_col;
+  for(int i=0;i<128;i++){
+    vec3 p=ro+rd*t; float d=mapScene(p);
+    if(d<0.003){ hit=true; mat=g_col; break; }
+    t+=d; if(t>12.) break;
+  }
+  if(hit){
+    vec3 p=ro+rd*t; vec3 n=calcNormalSDF(p,0.003);
+    col=shadeMech(p,n,rd,mat,0.9);
+    col=mix(col,vec3(.55,.65,.8),1.-exp(-t*.12));
+    col=pow(max(col,0.),vec3(0.45));
+  }
+  fragColor=vec4(col,1.);
+}`;
+
+const TERRAIN_RULE_FS = `#version 300 es
+precision highp float;
+uniform float u_time; uniform vec2 u_res; out vec4 fragColor;
+${COMMON_MATH}
+vec3 g_col=vec3(0.4,0.35,0.28);
+float ruleHeight(vec2 xz){
+  float h=0.;
+  float qx=step(0.,xz.x)*2.-1.,qz=step(0.,xz.y)*2.-1.;
+  h+=qx*qz*0.3;
+  h+=step(abs(xz.x),.4)*.45*max(.5-abs(xz.y),0.);
+  h+=step(abs(xz.y),.5)*.3*max(.5-abs(xz.x),0.);
+  h+=(1.-abs(xz.x+xz.y)*.7)*.2;
+  h+=(1.-abs(xz.x-xz.y)*.7)*.15;
+  float edge=max(abs(xz.x),abs(xz.y));
+  h*=max(0.,1.-edge*.8);
+  return clamp(h,-.5,1.);
+}
+float mapScene(vec3 p){
+  float h=ruleHeight(p.xz*1.1)*.9-.6;
+  float d=p.y-h;
+  float nh=(h+.6)/.9;
+  vec3 rock=vec3(0.42,.36,.28),grass=vec3(0.22,.4,.15),snow=vec3(0.88,.9,.92);
+  g_col=mix(grass,rock,smoothstep(.3,.6,nh));
+  g_col=mix(g_col,snow,smoothstep(.78,1.,nh));
+  return d;
+}
+${COMMON_LIGHTING}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y;
+  vec3 ro=vec3(sin(u_time*.15)*1.5+.5,1.2,cos(u_time*.15)*1.5+2.),ta=vec3(0.,-.2,0.);
+  vec3 ww=normalize(ta-ro),uu=normalize(cross(ww,vec3(0,1,0))),vv=cross(uu,ww);
+  vec3 rd=normalize(uv.x*uu+uv.y*vv+1.4*ww);
+  float t=0.05; vec3 col=vec3(0.45,.6,.8); bool hit=false; vec3 mat=g_col;
+  for(int i=0;i<128;i++){
+    vec3 p=ro+rd*t; float d=mapScene(p)*.6;
+    if(d<0.003){ hit=true; mat=g_col; break; }
+    t+=d; if(t>12.) break;
+  }
+  if(hit){
+    vec3 p=ro+rd*t; vec3 n=calcNormalSDF(p,0.005);
+    col=shadeMech(p,n,rd,mat,.92);
+    col=mix(col,vec3(.55,.65,.8),1.-exp(-t*.12));
+    col=pow(max(col,0.),vec3(0.45));
+  }
+  fragColor=vec4(col,1.);
+}`;
+
+const TERRAIN_NOISE_FS = `#version 300 es
+precision highp float;
+uniform float u_time; uniform vec2 u_res; out vec4 fragColor;
+${COMMON_MATH}
+vec3 g_col=vec3(0.3,0.45,0.25);
+float terrainH(vec2 xz){
+  float h=fbm(xz*1.8+vec2(3.1,1.7));
+  h+=fbm(xz*3.5+vec2(1.1,2.3))*.35;
+  h+=fbm(xz*7.2)*.12;
+  return h*.9-.35;
+}
+float mapScene(vec3 p){
+  float h=terrainH(p.xz);
+  float d=p.y-h;
+  float nh=(h+.35)/.9;
+  vec3 sand=vec3(0.7,.6,.4),grass=vec3(0.22,.46,.16),rock=vec3(0.44,.38,.30),snow=vec3(0.9,.92,.95);
+  g_col=mix(sand,grass,smoothstep(.05,.18,nh));
+  g_col=mix(g_col,rock,smoothstep(.35,.58,nh));
+  g_col=mix(g_col,snow,smoothstep(.78,.95,nh));
+  return d;
+}
+${COMMON_LIGHTING}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-u_res*.5)/u_res.y;
+  vec3 ro=vec3(sin(u_time*.15)*1.5+.5,1.2,cos(u_time*.15)*1.5+2.),ta=vec3(0.,-.15,0.);
+  vec3 ww=normalize(ta-ro),uu=normalize(cross(ww,vec3(0,1,0))),vv=cross(uu,ww);
+  vec3 rd=normalize(uv.x*uu+uv.y*vv+1.4*ww);
+  float t=0.05; vec3 col=vec3(0.45,.6,.8); bool hit=false; vec3 mat=g_col;
+  for(int i=0;i<128;i++){
+    vec3 p=ro+rd*t; float d=mapScene(p)*.6;
+    if(d<0.003){ hit=true; mat=g_col; break; }
+    t+=d; if(t>12.) break;
+  }
+  if(hit){
+    vec3 p=ro+rd*t; vec3 n=calcNormalSDF(p,0.006);
+    col=shadeMech(p,n,rd,mat,.95);
+    col=mix(col,vec3(.55,.65,.8),1.-exp(-t*.12));
+    col=pow(max(col,0.),vec3(0.45));
+  }
+  fragColor=vec4(col,1.);
+}`;
+
+const configs = [
+  ['cell-robot-sdf',    ROBOT_SDF_FS,    480,260],
+  ['cell-robot-rule',   ROBOT_RULE_FS,   480,260],
+  ['cell-robot-noise',  ROBOT_NOISE_FS,  480,260],
+  ['cell-tree-sdf',     TREE_SDF_FS,     480,260],
+  ['cell-tree-rule',    TREE_RULE_FS,    480,260],
+  ['cell-tree-noise',   TREE_NOISE_FS,   480,260],
+  ['cell-terrain-sdf',  TERRAIN_SDF_FS,  480,260],
+  ['cell-terrain-rule', TERRAIN_RULE_FS, 480,260],
+  ['cell-terrain-noise',TERRAIN_NOISE_FS,480,260],
+];
+
+configs.forEach(([id,fs,w,h],i)=>{
+  setTimeout(()=>setupCanvas(id,fs,w,h), i*140);
+});
+</script>
+</body>
+</html>
